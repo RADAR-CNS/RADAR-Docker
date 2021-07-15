@@ -99,5 +99,16 @@ $ docker-compose up
 ```
 
 ### Multi-host setup
+While the singlehost deloyment found in this repository will not provide the scalability beyond a certain limited context, additional options are available for scaling-out the platform components:
 
-In the end, we aim to deploy the platform in a multi-host environment. We are currently aiming for a deployment with Docker Swarm. This setup uses features that are not yet released in the stable Docker Engine. Once they are, this stack may become the main Docker stack. See the `wip/radar-swarm-cp-stack/` directory for more information.
+For multi-host setups please refer to the repositories here:
+#### Kubernetes
+To deploy RADAR-base containers on a Kubernetes cluster: 
+[RADAR-Kubernetes](https://github.com/RADAR-base/RADAR-Kubernetes)
+
+#### Teraform
+To deploy RADAR-base components on separate VM Docker hosts in a variety of public and private cloud providers example Teraform scripts are available here:
+[RADAR-Terraform](https://github.com/RADAR-base/RADAR-Terraform)
+
+
+
