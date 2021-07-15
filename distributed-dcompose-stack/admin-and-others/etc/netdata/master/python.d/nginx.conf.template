@@ -1,0 +1,3 @@
+webserver:
+     name : 'Reverse_Proxy'
+     url  : '${WEBSERVER_STATUS_STUB_URL}'

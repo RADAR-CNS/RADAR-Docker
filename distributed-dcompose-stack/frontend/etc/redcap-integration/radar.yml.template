@@ -1,0 +1,17 @@
+# ManagementPortal configuration
+management_portal:
+  oauth_client_id: radar_redcap_integrator #OAuth2 clientId used by the webApp for making requests
+  oauth_client_secret: secret #OAuth2 client secrete
+  base_url: http://managementportal-app:8080/managementportal/ #URL pointing Management Portal
+
+# Set of supported projects
+projects:
+  - redcap_info:
+      url: #URL pointing REDCap instance
+      project_id: #REDCap project identifier
+      enrolment_event: #Unique identifier for the enrolment event
+      integration_form: #Name of integration REDCap form
+      token: #REDCap API Token used to identify the REDCap user against the REDCap instance
+  - mp_info:
+      # Management Portal project identifier
+      project_name: #

@@ -1,0 +1,117 @@
+---
+version: '2.2'
+
+networks:
+  api:
+    driver: bridge
+    internal: true
+  hotstorage:
+    driver: bridge
+    internal: true
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR Hot Storage                                                         #
+  #---------------------------------------------------------------------------#
+  hotstorage:
+    image: radarbase/radar-hotstorage:0.1
+    networks:
+      - hotstorage
+      - default
+    volumes:
+      - "${MONGODB_DIR}/db:/data/db"
+      - "${MONGODB_DIR}/configdb:/data/configdb"
+    restart: always
+    environment:
+      RADAR_USER: ${HOTSTORAGE_USERNAME}
+      RADAR_PWD: ${HOTSTORAGE_PASSWORD}
+      RADAR_DB: ${HOTSTORAGE_NAME}
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongo", "-u", "${HOTSTORAGE_USERNAME}", "-p", "${HOTSTORAGE_PASSWORD}", "${HOTSTORAGE_NAME}", "--eval", "db"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR REST API                                                            #
+  #---------------------------------------------------------------------------#
+  rest-api:
+    image: radarbase/radar-restapi:0.3
+    networks:
+      - hotstorage
+      - api
+      - default
+    depends_on:
+      - hotstorage
+    restart: always
+    volumes:
+      - "./etc/rest-api:/usr/local/conf/radar/rest-api"
+    environment:
+      RADAR_IS_CONFIG_LOCATION: usr/local/conf/radar/rest-api/radar-is.yml
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8080/api/openapi.json"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR Dashboard                                                           #
+  #---------------------------------------------------------------------------#
+  dashboard:
+    image: radarcns/radar-dashboard:2.1.0
+    networks:
+      - api
+      - default
+    depends_on:
+      - rest-api
+    restart: always
+    environment:
+      API_URI: https://${SERVER_NAME}/api
+      BASE_HREF: /dashboard/
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "wget", "-s", "http://localhost:80/"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR backend streams                                                     #
+  #---------------------------------------------------------------------------#
+  radar-backend-stream:
+    image: radarbase/radar-backend:0.4.0
+    command:
+      - stream
+    networks:
+      # for getting the play store category
+      - default
+    volumes:
+      - ./etc/radar-backend/radar.yml:/etc/radar.yml
+    restart: always
+    environment:
+      KAFKA_REST_PROXY: ${REST_PROXY_URL}
+      KAFKA_SCHEMA_REGISTRY: ${SCHEMA_REGISTRY_URL}
+      KAFKA_BROKERS: 3
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

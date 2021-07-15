@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+set -u
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+. .env
+
+
+if [ -n "$POSTGRES_MULTIPLE_DATABASES" ]; then
+  echo "Waiting for postgres database..."
+  for count in {1..120}; do
+    if pg_isready --username "$POSTGRES_USER" --quiet --host ${POSTGRES_HOST} --port ${POSTGRES_PORT}; then
+      echo "Database ready."
+      exec "$@"
+    fi
+    sleep 1
+  done
+
+  echo "Postgres database timeout"
+  exit 1
+fi

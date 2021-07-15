@@ -1,0 +1,40 @@
+SEND_SLACK="${NETDATA_ALERT_SLACK_ENABLE}"
+
+SLACK_WEBHOOK_URL="${NETDATA_ALERT_SLACK_WEBHOOK}"
+
+# if a role's recipients are not configured, a notification will be send to:
+# - A slack channel (syntax: '#channel' or 'channel')
+# - A slack user (syntax: '@user')
+# - The channel or user defined in slack for the webhook (syntax: '#')
+# empty = do not send a notification for unconfigured roles
+
+DEFAULT_RECIPIENT_SLACK="${NETDATA_ALERT_SLACK_CHANNEL}"
+
+SEND_EMAIL="NO"
+
+DEFAULT_RECIPIENT_EMAIL="${MAINTAINER_EMAIL}"
+
+# The full path to the sendmail command.
+# If empty, the system $PATH will be searched for it.
+# If not found, email notifications will be disabled (silently).
+
+sendmail="/usr/bin/msmtp"
+
+###############################################################################
+# RECIPIENTS PER ROLE
+
+# -----------------------------------------------------------------------------
+# generic system alarms
+# CPU, disks, network interfaces, entropy, etc
+
+role_recipients_email[sysadmin]="${DEFAULT_RECIPIENT_EMAIL}"
+
+role_recipients_slack[sysadmin]="${DEFAULT_RECIPIENT_SLACK}"
+
+# -----------------------------------------------------------------------------
+# web servers alarms
+# apache, nginx, lighttpd, etc
+
+role_recipients_email[webmaster]="${DEFAULT_RECIPIENT_EMAIL}"
+
+role_recipients_slack[webmaster]="${DEFAULT_RECIPIENT_SLACK}"

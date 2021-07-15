@@ -1,0 +1,2 @@
+resourceName: res_RestApi
+publicKeyEndpoints: http://managementportal-app:8080/managementportal/oauth/token_key

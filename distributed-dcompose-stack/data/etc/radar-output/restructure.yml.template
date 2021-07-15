@@ -1,0 +1,116 @@
+service:
+  # Whether to run the application as a polling service.
+  enable: true
+  # Polling interval in seconds.
+  interval: 3600
+
+# Source data resource
+# @since: 0.7.0
+source:
+  type: hdfs  # hdfs or s3
+  # s3:
+  #   endpoint: http://localhost:9000  # using AWS S3 endpoint is also possible.
+  #   bucket: radar
+  #   accessToken: minioadmin
+  #   secretKey: minioadmin
+  # only actually needed if source type is hdfs
+  hdfs:
+    nameNodes: [hdfs-namenode-1, hdfs-namenode-2]
+
+# Target data resource
+# @since: 0.7.0
+target:
+  type: local  # s3 or local
+  # s3:
+  #   endpoint: http://localhost:9000
+  #   bucket: out
+  #   accessToken: minioadmin
+  #   secretKey: minioadmin
+  # only actually needed if target type is local
+  local:
+    userId: -1  # write as regular user, use -1 to use current user (default).
+    groupId: -1  # write as regular group, use -1 to use current user (default).
+
+# Redis configuration
+# @since: 0.7.0
+redis:
+  # Redis URI
+  uri: redis://redis:6379?password=radar
+  # Key prefix for locks
+  lockPrefix: radar-output/lock/
+
+# Compression characteristics
+compression:
+  # Compression type: none, zip or gzip
+  type: gzip
+  # Compression Factory class
+  # factory: org.radarbase.hdfs.compression.CompressionFactory
+  # Additional compression properties
+  # properties: {}
+
+# File format
+format:
+  # Format type: CSV or JSON
+  type: csv
+  # Whether to deduplicate the files in each topic by default
+  deduplication:
+    enable: true
+    # Use specific fields to consider records distinct. Disregarded if empty.
+    # distinctFields: []
+    # Ignore specific fields to consider records distinct. Disregarded if empty.
+    # ignoreFields: []
+  # Format factory class
+  # factory: org.radarbase.hdfs.format.FormatFactory
+  # Additional format properties
+  # properties: {}
+
+# Worker settings
+worker:
+  # Maximum number of files and converters to keep open while processing
+  cacheSize: 300
+  # Number of threads to do processing on
+  numThreads: 8
+  # Maximum number of files to process in any given topic.
+  maxFilesPerTopic: null
+  # Minimum time in seconds since a source file was last modified before it is
+  # considered for processing. This avoids synchronization issues when a file has just been
+  # written.
+  minimumFileAge: 60
+
+# Path settings
+paths:
+  # Input directories in source
+  inputs:
+    - /topicAndroidNew
+  # Root temporary directory for local file processing.
+  temp: ./output/+tmp
+  # Output directory in target
+  output: /output
+  # Output path construction factory
+  # factory: org.radarbase.output.path.MonthlyObservationKeyPathFactory
+  # Additional properties
+  # properties: {}
+
+# Individual topic configuration
+# topics:
+#   # topic name
+#   connect_fitbit_source:
+#     # deduplicate this topic, regardless of the format settings
+#     deduplication:
+#       enable: true
+#       # deduplicate this topic only using given fields.
+#       distinctFields: [key.sourceId, value.time]
+#   # topic name
+#   connect_fitbit_source2:
+#     # deduplicate this topic, regardless of the format settings
+#     deduplication:
+#       enable: true
+#       # deduplicate this topic without regard of given fields.
+#       ignoreFields: [value.timeReceived]
+#   connect_fitbit_bad:
+#     # Do not process this topic
+#     exclude: true
+#   biovotion_acceleration:
+#     # Disable deduplication
+#     deduplication:
+#       enable: false

@@ -1,0 +1,86 @@
+version: 1.0
+released: 2018-09-13
+
+#============================== Zookeeper ==============================#
+#List of Zookeeper instances
+zookeeper:
+    - host: zookeeper-1
+      port: 2181
+
+#================================ Kafka ================================#
+#List of Kafka brokers
+broker:
+    - host: kafka-1
+      port: 9092
+
+#=========================== Schema Registry ===========================#
+#List of Schema Registry instances
+schema_registry:
+    - host: schema-registry-1
+      port: 8081
+      protocol: http
+
+#=========================== Kafka REST Proxy ===========================#
+#List of kafka Rest proxy instances
+rest_proxy:
+    host: rest-proxy-1
+    port: 8082
+    protocol: http
+
+#======================== Battery level monitor ========================#
+battery_monitor:
+  level: LOW
+  notify: # Each project can have a number of email addresses
+    - project_id: s1
+      email_address:
+        - notifier1@email
+    - project_id: s2
+      email_address:
+        - notifier2@email
+  email_host: smtp
+  email_port: 25
+  email_user: user@example.com
+  topics:
+    - android_empatica_e4_battery_level
+
+#======================= Disconnection monitor==========================#
+disconnect_monitor:
+  notify: # Each project can have a number of email addresses
+    - project_id: s1
+      email_address:
+        - notifier1@email
+    - project_id: s2
+      email_address:
+        - notifier2@email
+  email_host: smtp
+  email_port: 25
+  email_user: user@example.com
+  topics:
+    - android_empatica_e4_temperature
+  timeout: 1800  # seconds after which a stream is set disconnected
+  alert_repetitions: 2  # number of additional emails to send after the first
+
+stream:
+  #====================== Source statistics monitor ======================#
+  source_statistics:
+    - name: Empatica E4
+      topics:
+        - android_empatica_e4_blood_volume_pulse_1min
+      output_topic: source_statistics_empatica_e4
+    - name: Biovotion VSM1
+      topics:
+        - android_biovotion_vsm1_acceleration_1min
+      output_topic: source_statistics_biovotion_vsm1
+    - name: RADAR pRMT
+      topics:
+        - android_phone_acceleration_1min
+        - android_phone_bluetooth_devices
+        - android_phone_sms
+        - android_phone_contacts
+        - android_phone_usage_event
+        - android_phone_relative_location
+        - android_phone_battery_life
+        - android_phone_gyroscope
+      output_topic: source_statistics_android_phone
+
+persistence_path: /var/lib/radar/data

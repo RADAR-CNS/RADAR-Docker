@@ -1,0 +1,14 @@
+[Unit]
+Description=RADAR-Docker renew certificate service
+
+[Service]
+
+WorkingDirectory=
+
+ExecStart=
+
+NotifyAccess=all
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=radar-renew-certificate

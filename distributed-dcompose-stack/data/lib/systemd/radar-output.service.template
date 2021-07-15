@@ -1,0 +1,17 @@
+[Unit]
+Description=RADAR-Docker service
+After=radar-docker.service
+
+[Service]
+
+WorkingDirectory=
+
+ExecStart=
+
+NotifyAccess=all
+
+Environment=DOCKER_OPTS=
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=radar-output

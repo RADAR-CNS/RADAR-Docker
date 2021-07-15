@@ -1,0 +1,71 @@
+---
+version: '2.2'
+
+services:
+  #---------------------------------------------------------------------------#
+  # KSQLDB Server                                                         #
+  #---------------------------------------------------------------------------#
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:${KSQL_VERSION}
+    hostname: ${HOSTNAME}
+    container_name: ksqldb-server
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./etc/ksql/queries.sql:/ksql/queries.sql
+      - ./etc/ksql/udfs:/opt/ksqldb-udfs
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_ADVERTISED_LISTENER: http://${HOSTNAME}:8088
+      KSQL_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_1_HOST}
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+      KSQL_KSQL_SERVICE_ID: ${KSQL_CLUSTER_ID}
+      KSQL_KSQL_PERSISTENCE_DEFAULT_FORMAT_KEY: AVRO
+      KSQL_KSQL_PERSISTENCE_DEFAULT_FORMAT_VALUE: AVRO
+      KSQL_KSQL_QUERIES_FILE: /ksql/queries.sql
+      KSQL_KSQL_EXTENSION_DIR: "/opt/ksqldb-udfs"
+      KSQL_KSQL_SINK_REPLICAS: 3
+      KSQL_KSQL_STREAMS_REPLICATION_FACTOR: 3
+      KSQL_KSQL_INTERNAL_TOPIC_REPLICAS: 3
+      # Logging to Kafka topic (Uncomment to enable)
+      # KSQL_LOG4J_APPENDER_KAFKA_APPENDER: org.apache.kafka.log4jappender.KafkaLog4jAppender
+      # KSQL_LOG4J_APPENDER_KAFKA_APPENDER_LAYOUT: io.confluent.common.logging.log4j.StructuredJsonLayout
+      # KSQL_LOG4J_APPENDER_KAFKA_APPENDER_BROKERLIST: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_1_HOST}
+      # KSQL_LOG4J_APPENDER_KAFKA_APPENDER_TOPIC: KSQL_LOG
+      # KSQL_LOG4J_LOGGER_IO_CONFLUENT_KSQL: INFO,kafka_appender
+
+
+  #---------------------------------------------------------------------------#
+  # KSQLDB Client                                                         #
+  #---------------------------------------------------------------------------#
+
+  # Access the cli by running:
+  # > docker-compose exec ksqldb-cli ksql http://ksqldb-server:8088
+  ksqldb-cli:
+    image: ${KSQL_IMAGE_BASE}confluentinc/ksqldb-cli:${KSQL_VERSION}
+    container_name: ksqldb-cli
+    depends_on:
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
+
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

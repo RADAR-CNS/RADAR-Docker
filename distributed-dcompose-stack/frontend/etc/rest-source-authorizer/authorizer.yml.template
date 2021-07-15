@@ -1,0 +1,35 @@
+service:
+  # base url for authorizer-app-backend service
+  baseUri: http://0.0.0.0:8080/rest-sources/backend/
+  # advertised url of the service
+  advertisedBaseUri: http://0.0.0.0:8080/rest-sources/backend/
+  # if cors filter should be enabled
+  enableCors: true
+
+auth:
+  # Management Portal URL
+  managementPortalUrl: http://managementportal-app:8080/managementportal/
+  # OAuth2 Client id of authorizer-app-backend application
+  clientId: radar_rest_sources_auth_backend
+  # OAuth2 Client Secret of authorizer-app-backend client
+  clientSecret: secret
+
+database:
+  # JDBC Driver of the database used for persistence
+  driver: org.postgresql.Driver
+  # JBDC database connection url
+  url: jdbc:postgresql://radarbase-postgresql:5432/restsourceauthorizer
+  # Database username
+  user: radarcns
+  # Database password
+  password: radarcns
+  dialect: org.hibernate.dialect.PostgreSQLDialect
+
+restSourceClients:
+  # List of rest-source types and properties e.g FitBit, Garmin
+  - sourceType: FitBit
+    authorizationEndpoint: https://www.fitbit.com/oauth2/authorize
+    tokenEndpoint: https://api.fitbit.com/oauth2/token
+    clientId: Fitbit-clientid
+    clientSecret: Fitbit-clientsecret
+    scope: activity heartrate sleep profile

@@ -1,0 +1,11 @@
+[Unit]
+Description=RADAR-Docker renew ssl certificate daily
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=12h
+Persistent=true
+Unit=radar-renew-certificate.service
+
+[Install]
+WantedBy=default.target

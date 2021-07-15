@@ -1,0 +1,52 @@
+---
+version: '2.2'
+
+networks:
+  redis:
+    external: true
+
+services:
+  radar-output:
+    image: radarbase/radar-output-restructure:1.1.1-hdfs
+    restart: always
+    stop_signal: SIGINT
+    networks:
+      - redis
+    depends_on:
+      - redis
+    volumes:
+      - ${RESTRUCTURE_OUTPUT_DIR}:/output
+      - ./etc/radar-output/restructure.yml:/etc/restructure.yml
+    environment:
+      RADAR_OUTPUT_RESTRUCTURE_OPTS: ${RADAR_HDFS_RESTRUCTURE_OPTS}
+    command: -F /etc/restructure.yml -S
+
+  redis:
+    image: bitnami/redis
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    restart: always
+    networks:
+      - redis
+    volumes:
+      - "${REDIS_DATA_PATH}:/bitnami/redis/data"
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

@@ -1,0 +1,136 @@
+---
+version: '2.2'
+
+volumes:
+  fitbit-logs: {}
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR mongo connector                                                     #
+  #---------------------------------------------------------------------------#
+  radar-mongodb-connector:
+    image: radarbase/kafka-connect-mongodb-sink:0.2.2
+    restart: on-failure
+    volumes:
+      - ./etc/mongodb-connector/sink-mongo.properties:/etc/kafka-connect/sink.properties
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_1_HOST}
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: "default"
+      CONNECT_CONFIG_STORAGE_TOPIC: "default.config"
+      CONNECT_OFFSET_STORAGE_TOPIC: "default.offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "default.status"
+      CONNECT_KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_OFFSET_STORAGE_FILE_FILENAME: "/tmp/connect2.offset"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "radar-mongodb-connector"
+      CONNECT_ZOOKEEPER_CONNECT: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+      CONNECT_CONSUMER_MAX_POLL_RECORDS: 500
+      CONNECT_CONSUMER_MAX_POLL_INTERVAL_MS: 300000
+      CONNECT_CONSUMER_SESSION_TIMEOUT_MS: 10000
+      CONNECT_CONSUMER_HEARTBEAT_INTERVAL_MS: 3000
+      CONNECT_PLUGIN_PATH: /usr/share/java/kafka-connect/plugins
+      KAFKA_BROKERS: 3
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_LOG4J_LOGGERS: "org.reflections=ERROR"
+    healthcheck:
+      test: ["CMD-SHELL", "curl  -sf localhost:8083/connectors/radar-connector-mongodb-sink/status | grep -o '\"state\":\"[^\"]*\"' | tr '\\n' ',' | grep -vq FAILED || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR HDFS connector                                                     #
+  #---------------------------------------------------------------------------#
+  radar-hdfs-connector:
+    image: radarbase/radar-connect-hdfs-sink:0.2.1
+    restart: on-failure
+    volumes:
+      - ./etc/hdfs-connector/sink-hdfs.properties:/etc/kafka-connect/sink-hdfs.properties
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_1_HOST}
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: "default"
+      CONNECT_CONFIG_STORAGE_TOPIC: "default.config"
+      CONNECT_OFFSET_STORAGE_TOPIC: "default.offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "default.status"
+      CONNECT_KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_OFFSET_STORAGE_FILE_FILENAME: "/tmp/connect2.offset"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "radar-hdfs-connector"
+      CONNECT_ZOOKEEPER_CONNECT: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+      CONNECTOR_PROPERTY_FILE_PREFIX: "sink-hdfs"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx768m"
+      KAFKA_BROKERS: 3
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_LOG4J_LOGGERS: "org.reflections=ERROR"
+    healthcheck:
+      test: ["CMD-SHELL", "curl  -sf localhost:8083/connectors/radar-hdfs-sink-android-15000/status | grep -o '\"state\":\"[^\"]*\"' | tr '\\n' ',' | grep -vq FAILED || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR Fitbit connector                                                     #
+  #---------------------------------------------------------------------------#
+  radar-fitbit-connector:
+    image: radarbase/kafka-connect-rest-fitbit-source:0.3.2
+    restart: on-failure
+    volumes:
+      - ./etc/fitbit-connector/docker/source-fitbit.properties:/etc/kafka-connect/source-fitbit.properties
+      - ./etc/fitbit-connector/docker/users:/var/lib/kafka-connect-fitbit-source/users
+      - fitbit-logs:/var/lib/kafka-connect-fitbit-source/logs
+    networks:
+      - default
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_1_HOST}
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: "default"
+      CONNECT_CONFIG_STORAGE_TOPIC: "default.config"
+      CONNECT_OFFSET_STORAGE_TOPIC: "default.offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "default.status"
+      CONNECT_KEY_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_OFFSET_STORAGE_FILE_FILENAME: "/var/lib/kafka-connect-fitbit-source/logs/connect.offsets"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "radar-fitbit-connector"
+      CONNECT_ZOOKEEPER_CONNECT: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+      CONNECTOR_PROPERTY_FILE_PREFIX: "source-fitbit"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx768m"
+      KAFKA_BROKERS: 3
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_LOG4J_LOGGERS: "org.reflections=ERROR"
+    healthcheck:
+      test: ["CMD-SHELL", "curl  -sf localhost:8083/connectors/radar-fitbit-source/status | grep -o '\"state\":\"[^\"]*\"' | tr '\\n' ',' | grep -vq FAILED || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

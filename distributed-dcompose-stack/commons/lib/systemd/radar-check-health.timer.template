@@ -1,0 +1,10 @@
+[Unit]
+Description=RADAR-Docker health checking every 5 minutes
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+Unit=radar-check-health.service
+
+[Install]
+WantedBy=default.target

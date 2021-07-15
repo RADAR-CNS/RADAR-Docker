@@ -1,0 +1,57 @@
+#!/bin/bash
+
+if [ $# = 0 ]; then
+  echo "Usage: $0 VERSION"
+  exit 1
+fi
+
+NEW_VERSION=$1
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+. ./.env
+. ../commons/lib/util.sh
+
+echo "Are you sure you want to to upgrade POSTGRESQL from version ${POSTGRES_VERSION} to ${NEW_VERSION}?"
+
+select yn in "Yes" "No"; do
+    case $yn in
+        Yes ) break;;
+        No ) exit;;
+    esac
+done
+
+# Ensure that the base image exists
+docker pull postgres:${NEW_VERSION}
+
+POSTGRES_NEW_DIR="${MP_POSTGRES_DIR}/data-${NEW_VERSION}"
+
+if [ -e "${POSTGRES_NEW_DIR}" ]; then
+  echo "Please remove old temporary directory $POSTGRES_NEW_DIR before proceeding"
+  exit 1
+fi
+
+echo "==> Starting new postgres database with temporary directory ${POSTGRES_NEW_DIR}"
+POSTGRES_NEW=$(docker run -d -v "${POSTGRES_NEW_DIR}/:/var/lib/postgresql/data" --env-file ./.env postgres:${NEW_VERSION})
+sleep 5
+
+echo "==> Migrating ManagementPortal database to ${NEW_VERSION}"
+docker-compose exec radarbase-postgresql pg_dumpall -U "${POSTGRES_USER}" \
+  | docker exec -i ${POSTGRES_NEW} psql -U "${POSTGRES_USER}"
+
+docker rm -vf "${POSTGRES_NEW}"
+
+echo "==> Stopping postgres..."
+docker-compose stop radarbase-postgresql
+docker-compose rm -vf radarbase-postgresql
+
+echo "==> Moving old data to backup ${MP_POSTGRES_DIR}/data-backup-$(date +%FT%TZ)/"
+mv "${MP_POSTGRES_DIR}/data/" "${MP_POSTGRES_DIR}/data-backup-$(date +%FT%TZ)/"
+mv "${POSTGRES_NEW_DIR}" "${MP_POSTGRES_DIR}/data/"
+
+# change postgres version
+inline_variable " image: postgres:" "${NEW_VERSION}" docker-compose.yml
+ensure_variable "POSTGRES_VERSION=" "${NEW_VERSION}" .env
+
+echo "==> Starting postgres..."
+
+sudo-linux docker-compose up -d radarbase-postgresql

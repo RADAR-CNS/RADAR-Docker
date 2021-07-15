@@ -1,0 +1,32 @@
+#!/bin/bash
+
+DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)
+
+if [[ $# -lt 1 || $1 = "-h" || $1 = "--help" ]]; then
+   printf "Usage:\n$0 <hdfs path> [<destination directory>]\nThe destination directory defaults to ./output\n"
+   exit 1
+fi
+
+. "$DIR/../commons/lib/util.sh"
+. "$DIR/.env"
+
+# HDFS filename to get
+HDFS_FILE=$1
+# Absolute directory to write output to
+OUTPUT_DIR=${2:-$DIR/output}
+OUTPUT_DIR="$(cd "$(dirname "$OUTPUT_DIR")"; pwd)/$(basename "$OUTPUT_DIR")"
+# Internal docker directory to write output to
+HDFS_OUTPUT_DIR=/home/output
+# HDFS command to run
+HDFS_COMMAND="hdfs dfs -get $HDFS_FILE $HDFS_OUTPUT_DIR"
+DOCKER_OPTS=(
+  -i --rm
+  --network hadoop
+  -v "$OUTPUT_DIR:$HDFS_OUTPUT_DIR"
+  -e HADOOP_NAMENODE1_HOSTNAME=${HDFS_NAMENODE_URL})
+
+mkdir -p $OUTPUT_DIR
+
+echo "==> Extracting HDFS path $HDFS_FILE to $OUTPUT_DIR"
+echo docker run "${DOCKER_OPTS[@]}" radarbase/hdfs:${HDFS_BASE_VERSION} $HDFS_COMMAND
+sudo-linux docker run "${DOCKER_OPTS[@]}" radarbase/hdfs:${HDFS_BASE_VERSION} $HDFS_COMMAND

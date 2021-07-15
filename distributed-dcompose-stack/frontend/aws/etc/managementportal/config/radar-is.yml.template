@@ -1,0 +1,2 @@
+resourceName: res_ManagementPortal
+publicKeyEndpoints: http://${SERVER_NAME}/managementportal/oauth/token_key

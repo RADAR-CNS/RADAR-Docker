@@ -1,0 +1,28 @@
+# Kafka consumer configuration
+name=radar-connector-mongodb-sink
+
+# Kafka connector configuration
+connector.class=org.radarcns.connect.mongodb.MongoDbSinkConnector
+tasks.max=1
+
+# Topics that will be consumed
+topics=
+
+# MongoDB server
+mongo.host=hotstorage
+mongo.port=27017
+
+# MongoDB configuration
+mongo.username=
+mongo.password=
+mongo.database=
+
+# Collection name for putting data into the MongoDB database. The {$topic} token will be replaced
+# by the Kafka topic name.
+#mongo.collection.format={$topic}
+
+# Buffer Capacity for mogodb writer. Default value is 20000
+# buffer.capacity=20000
+
+# Factory class to do the actual record conversion
+record.converter.class=org.radarcns.connect.mongodb.serialization.RecordConverterFactory

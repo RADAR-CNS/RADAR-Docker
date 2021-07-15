@@ -1,0 +1,107 @@
+---
+version: '2.4'
+
+networks:
+  management:
+    driver: bridge
+    internal: true
+  mail:
+    driver: bridge
+    internal: true
+
+services:
+  #---------------------------------------------------------------------------#
+  # Email server                                                              #
+  #---------------------------------------------------------------------------#
+  smtp:
+    image: namshi/smtp:latest
+    networks:
+      - mail
+      - default
+    volumes:
+      - /var/spool/exim
+    restart: always
+    ports:
+      - "25:25"
+    env_file:
+      - ./etc/smtp.env
+
+  #---------------------------------------------------------------------------#
+  # Management Portal                                                         #
+  #---------------------------------------------------------------------------#
+  managementportal-app:
+    image: radarbase/management-portal:0.6.3
+    networks:
+      - management
+      - mail
+      - default
+    depends_on:
+      - smtp
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,swagger
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/managementportal
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      MANAGEMENTPORTAL_MAIL_FROM: ${FROM_EMAIL}
+      MANAGEMENTPORTAL_COMMON_BASEURL: https://${SERVER_NAME}/
+      MANAGEMENTPORTAL_COMMON_MANAGEMENT_PORTAL_BASE_URL: https://${SERVER_NAME}/managementportal
+      MANAGEMENTPORTAL_FRONTEND_CLIENT_SECRET: ${MANAGEMENTPORTAL_FRONTEND_CLIENT_SECRET}
+      MANAGEMENTPORTAL_OAUTH_CLIENTS_FILE: /mp-includes/config/oauth_client_details.csv
+      MANAGEMENTPORTAL_CATALOGUE_SERVER_ENABLE_AUTO_IMPORT: ${MANAGEMENTPORTAL_CATALOGUE_SERVER_ENABLE_AUTO_IMPORT}
+      MANAGEMENTPORTAL_CATALOGUE_SERVER_SERVER_URL: ${MANAGEMENTPORTAL_CATALOGUE_SERVER_URL}
+      MANAGEMENTPORTAL_COMMON_ADMIN_PASSWORD: ${MANAGEMENTPORTAL_COMMON_ADMIN_PASSWORD}
+      MANAGEMENTPORTAL_COMMON_PRIVACY_POLICY_URL: ${MANAGEMENTPORTAL_COMMON_PRIVACY_POLICY_URL}
+      MANAGEMENTPORTAL_OAUTH_META_TOKEN_TIMEOUT: PT2H
+      MANAGEMENTPORTAL_OAUTH_ENABLE_PUBLIC_KEY_VERIFIERS: "true"
+      RADAR_IS_CONFIG_LOCATION: /mp-includes/config/radar-is.yml
+      SPRING_APPLICATION_JSON: '{"managementportal":{"oauth":{"checkingKeyAliases":["${MANAGEMENTPORTAL_OAUTH_CHECKING_KEY_ALIASES_0}","${MANAGEMENTPORTAL_OAUTH_CHECKING_KEY_ALIASES_1}"]}}}'
+      JHIPSTER_SLEEP: 10 # gives time for the database to boot before the application
+      JAVA_OPTS: -Xmx8g  # maximum heap size for the JVM running ManagementPortal, increase this as necessary
+    volumes:
+      - ./etc/managementportal/:/mp-includes/
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "localhost:8080/managementportal/oauth/token_key"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR REDCap Integration                                                  #
+  #---------------------------------------------------------------------------#
+  redcap-integration:
+    image: radarbase/radar-redcapintegration:1.0.3
+    networks:
+      - management
+      - default
+    depends_on:
+      - managementportal-app
+    restart: always
+    volumes:
+      - "./etc/redcap-integration:/usr/local/etc/radar-redcap-int"
+    ports:
+      - 9010:8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget --post-data {} http://localhost:8080/redcap/trigger 2>&1 | grep -q 400 || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

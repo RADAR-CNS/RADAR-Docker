@@ -1,0 +1,75 @@
+# Resource config class
+#resourceConfig: org.radarbase.gateway.inject.ManagementPortalEnhancerFactory
+
+server:
+    # URI to serve data to
+    baseUri: http://0.0.0.0:8090/push/integrations/
+    # Maximum number of simultaneous requests to Kafka.
+    #maxRequests: 200
+    # Maximum request content length, also when decompressed.
+    # This protects against memory overflows.
+    #maxRequestSize: 25165824
+    # Whether JMX should be enabled. Disable if not needed, for higher performance.
+    #isJmxEnabled: true
+
+kafka:
+    # Number of Kafka brokers to keep in a pool for reuse in multiple requests.
+    # poolSize: 20
+    # Kafka producer settings. Read from https://kafka.apache.org/documentation/#producerconfigs.
+    producer:
+        bootstrap.servers: localhost:9093
+    # Kafka Admin Client settings. Read from https://kafka.apache.org/documentation/#adminclientconfigs.
+    #admin:
+        # bootstrap server property is copied from the producer settings if none is provided.
+        #bootstrap.servers: kafka-1:9092
+    # Kafka serialization settings, used in KafkaAvroSerializer. Read from [io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig].
+    serialization:
+        schema.registry.url: http://localhost:8081
+
+# Push Service specific configuration
+pushIntegration:
+    garmin:
+      enabled: true
+      consumerKey: 
+      consumerSecret: 
+
+      # userRepositoryClass: org.radarbase.push.integration.garmin.user.GarminServiceUserRepository
+      # userRepositoryUrl: "http://localhost:8080/",
+      # userRepositoryClientId: "radar_pushendpoint",
+      # userRepositoryClientSecret: "",
+      # userRepositoryTokenUrl: "http://managementportal-app:8080/oauth/token/",
+      # dailiesTopicName: "push_garmin_daily_summary",
+      # activitiesTopicName: "push_garmin_activity_summary",
+      # activityDetailsTopicName: "push_garmin_activity_detail",
+      # epochSummariesTopicName: "push_garmin_epoch_summary",
+      # sleepsTopicName: "push_garmin_sleep_summary",
+      # bodyCompositionsTopicName: "push_garmin_body_composition",
+      # stressTopicName: "push_garmin_stress_detail_summary",
+      # userMetricsTopicName: "push_garmin_user_metrics",
+      # moveIQTopicName: "push_garmin_move_iq_summary",
+      # pulseOXTopicName: "push_garmin_pulse_ox",
+      # respirationTopicName: "push_garmin_respiration",
+      # activityDetailsSampleTopicName: "push_garmin_activity_detail_sample",
+      # bodyBatterySampleTopicName: "push_garmin_body_battery_sample",
+      # heartRateSampleConverter: "push_garmin_heart_rate_sample",
+      # sleepLevelTopicName: "push_garmin_sleep_level",
+      # stressLevelTopicName: "push_garmin_stress_level"
+
+      backfill:
+          enabled: true
+          # maxThreads: 4
+          # defaultEndDate: "1593551598"
+
+          # Redis configuration
+          redis:
+              # Redis URI
+              uri: redis://redis:6379?password=radar
+              # Key prefix for locks
+              lockPrefix: radar-push-garmin/lock/
+          
+          # Specify custom user backfill start and end dates
+          # These will be used based on the implementation of the UserRepository
+          # userBackfill:
+          #   - userId: 
+          #     startDate: Instant,
+          #     endDate: Instant

@@ -1,0 +1,42 @@
+---
+version: '2.2'
+
+services:
+  #---------------------------------------------------------------------------#
+  # Push API Gateway                                                        #
+  #---------------------------------------------------------------------------#
+  radar-push-endpoint:
+    image: radarbase/radar-push-endpoint:0.1.1
+    ports:
+        - 8090:8090
+    volumes:
+        - ./etc/push-endpoint/gateway.yml:/etc/radar-gateway/gateway.yml
+
+  redis:
+    image: bitnami/redis
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    restart: always
+    volumes:
+      - "${REDIS_DATA_PATH}:/bitnami/redis/data"
+
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

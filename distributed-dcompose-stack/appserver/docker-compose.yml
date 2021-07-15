@@ -1,0 +1,63 @@
+---
+version: '2.2'
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR APPSERVER                                                           #
+  #---------------------------------------------------------------------------#
+  appserver:
+    image: radarbase/radar-appserver:1.1.0
+    restart: always
+    ports:
+      - 8080:8080
+    volumes:
+      - ./etc/appserver/radar_is.yml:/resources/radar_is.yml
+      - ${APPSERVER_LOG_DIR}:/var/log/radar/appserver/
+      - ${GOOGLE_APPLICATION_CREDENTIALS_FILE_PATH}:/resources/google-credentials.json
+    environment:
+      JDK_JAVA_OPTIONS: -Xmx4G -Djava.security.egd=file:/dev/./urandom
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_DB_URL}/${POSTGRES_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SECURITY_RADAR_MANAGEMENTPORTAL_URL: ${MANAGEMENT_PORTAL_URL}
+      GOOGLE_APPLICATION_CREDENTIALS: /resources/google-credentials.json
+      RADAR_ADMIN_USER: ${RADAR_ADMIN_USER}
+      RADAR_ADMIN_PASSWORD: ${RADAR_ADMIN_PASSWORD}
+      SPRING_APPLICATION_JSON: '{"spring":{"boot":{"admin":{"client":{"url":"http://spring-boot-admin:1111","username":"${SPRING_BOOT_ADMIN_USER_NAME}","password":"${SPRING_BOOT_ADMIN_USER_PASSWORD}"}}}}}'
+      RADAR_IS_CONFIG_LOCATION: "/resources/radar_is.yml"
+      SPRING_BOOT_ADMIN_CLIENT_INSTANCE_NAME: radar-appserver
+    healthcheck:
+      # should give an unauthenticated response, rather than a 404
+      test: ["CMD-SHELL", "wget --spider localhost:8080/projects 2>&1 | grep -q 401 || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  spring-boot-admin:
+    image: slydeveloper/spring-boot-admin:latest
+    restart: always
+    ports:
+      - 8888:1111
+    environment:
+      SPRING_BOOT_ADMIN_USER_NAME: ${SPRING_BOOT_ADMIN_USER_NAME}
+      SPRING_BOOT_ADMIN_USER_PASSWORD: ${SPRING_BOOT_ADMIN_USER_PASSWORD}
+      SPRING_BOOT_ADMIN_TITLE: RADAR-appserver
+      SPRING_APPLICATION_JSON: '{"spring":{"boot":{"admin":{"username":"${SPRING_BOOT_ADMIN_USER_NAME}","password":"${SPRING_BOOT_ADMIN_USER_PASSWORD}","title":"RADAR-appserver"}}}}'
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

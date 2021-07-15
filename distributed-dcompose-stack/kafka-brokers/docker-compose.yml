@@ -1,0 +1,224 @@
+---
+version: '2.2'
+
+networks:
+  zookeeper:
+    driver: bridge
+    internal: true
+  kafka:
+    driver: bridge
+    internal: true
+
+volumes:
+  zookeeper-1-data: {}
+  zookeeper-2-data: {}
+  zookeeper-3-data: {}
+  zookeeper-1-log: {}
+  zookeeper-2-log: {}
+  zookeeper-3-log: {}
+
+
+services:
+  #---------------------------------------------------------------------------#
+  # Zookeeper Cluster                                                         #
+  #---------------------------------------------------------------------------#
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:5.2.0
+    networks:
+      - zookeeper
+      - default
+    volumes:
+      - zookeeper-1-data:/var/lib/zookeeper/data
+      - zookeeper-1-log:/var/lib/zookeeper/logs
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
+    ports:
+      - 2181:2181
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "[ $$(echo dump | nc zookeeper-1 2181 | head -c1 | wc -c) -gt 0 ] || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  zookeeper-2:
+    image: confluentinc/cp-zookeeper:5.2.0
+    networks:
+      - zookeeper
+      - default
+    volumes:
+      - zookeeper-2-data:/var/lib/zookeeper/data
+      - zookeeper-2-log:/var/lib/zookeeper/logs
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
+    ports:
+      - 2182:2181
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "[ $$(echo dump | nc zookeeper-2 2181 | head -c1 | wc -c) -gt 0 ] || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  zookeeper-3:
+    image: confluentinc/cp-zookeeper:5.2.0
+    networks:
+      - zookeeper
+      - default
+    volumes:
+      - zookeeper-3-data:/var/lib/zookeeper/data
+      - zookeeper-3-log:/var/lib/zookeeper/logs
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
+    ports:
+      - 2183:2181
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "[ $$(echo dump | nc zookeeper-3 2181 | head -c1 | wc -c) -gt 0 ] || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # Kafka Cluster                                                             #
+  #---------------------------------------------------------------------------#
+  kafka-1:
+    image: confluentinc/cp-kafka:5.2.0
+    networks:
+      - kafka
+      - zookeeper
+      - default
+    volumes:
+      - ${KAFKA_BROKER_1_LOGS_PATH}:/var/lib/kafka/data
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    restart: always
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_LOCAL://kafka-1:29092,PLAINTEXT://${HOSTNAME}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_LOCAL:PLAINTEXT, PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_LOCAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 730
+      KAFKA_MESSAGE_MAX_BYTES: 4000048
+      KAFKA_LOG4J_LOGGERS: kafka.producer.async.DefaultEventHandler=INFO,kafka.controller=INFO,state.change.logger=INFO
+      KAFKA_COMPRESSION_TYPE: lz4
+      KAFKA_INTER_BROKER_PROTOCOL_VERSION: "2.2"
+      KAFKA_LOG_MESSAGE_FORMAT_VERSION: "2.2"
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: "false"
+      KAFKA_OFFSETS_RETENTION_MINUTES: 10080
+    ports:
+      - 9092:9092
+    healthcheck:
+      test: ["CMD-SHELL", "echo dump | nc zookeeper-1 2181 | grep -q /brokers/ids/1 || exit 1"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+
+  kafka-2:
+    image: confluentinc/cp-kafka:5.2.0
+    networks:
+      - kafka
+      - zookeeper
+      - default
+    volumes:
+      - ${KAFKA_BROKER_2_LOGS_PATH}:/var/lib/kafka/data
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    restart: always
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_LOCAL://kafka-2:29092,PLAINTEXT://${HOSTNAME}:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_LOCAL:PLAINTEXT, PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_LOCAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 730
+      KAFKA_MESSAGE_MAX_BYTES: 4000048
+      KAFKA_LOG4J_LOGGERS: kafka.producer.async.DefaultEventHandler=INFO,kafka.controller=INFO,state.change.logger=INFO
+      KAFKA_COMPRESSION_TYPE: lz4
+      KAFKA_INTER_BROKER_PROTOCOL_VERSION: "2.2"
+      KAFKA_LOG_MESSAGE_FORMAT_VERSION: "2.2"
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: "false"
+      KAFKA_OFFSETS_RETENTION_MINUTES: 10080
+    ports:
+      - 9093:9093
+    healthcheck:
+      test: ["CMD-SHELL", "echo dump | nc zookeeper-1 2181 | grep -q /brokers/ids/2 || exit 1"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+
+  kafka-3:
+    image: confluentinc/cp-kafka:5.2.0
+    networks:
+      - kafka
+      - zookeeper
+      - default
+    volumes:
+      - ${KAFKA_BROKER_3_LOGS_PATH}:/var/lib/kafka/data
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    restart: always
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_LOCAL://kafka-3:29092,PLAINTEXT://${HOSTNAME}:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_LOCAL:PLAINTEXT, PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_LOCAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 730
+      KAFKA_MESSAGE_MAX_BYTES: 4000048
+      KAFKA_LOG4J_LOGGERS: kafka.producer.async.DefaultEventHandler=INFO,kafka.controller=INFO,state.change.logger=INFO
+      KAFKA_COMPRESSION_TYPE: lz4
+      KAFKA_INTER_BROKER_PROTOCOL_VERSION: "2.2"
+      KAFKA_LOG_MESSAGE_FORMAT_VERSION: "2.2"
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: "false"
+      KAFKA_OFFSETS_RETENTION_MINUTES: 10080
+    ports:
+      - 9094:9094
+    healthcheck:
+      test: ["CMD-SHELL", "echo dump | nc zookeeper-1 2181 | grep -q /brokers/ids/3 || exit 1"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

@@ -1,0 +1,12 @@
+# Example for a user configuration file ~/.msmtprc
+#
+
+defaults
+
+account radar
+
+host ${HOSTNAME}
+
+from admin@radar-base.org
+
+account default : radar

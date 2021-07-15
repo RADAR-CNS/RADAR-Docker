@@ -1,0 +1,39 @@
+---
+version: '2.2'
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR Cold Storage                                                        #
+  #---------------------------------------------------------------------------#
+  hdfs-datanode:
+    build:
+      context: ../../dcompose-stack/radar-cp-hadoop-stack/images/hdfs
+      args:
+        BASE_VERSION: ${HDFS_BASE_VERSION}
+    image: radarbase/hdfs:${HDFS_BASE_VERSION}
+    hostname: ${HDFS_DATANODE_HOSTNAME}
+    command: datanode
+    volumes:
+      - "${HDFS_DATA_DIR_1}:/hadoop/dfs/data"
+    restart: always
+    environment:
+#      SERVICE_9866_NAME: datanode-1
+#      SERVICE_9867_IGNORE: "true"
+#      SERVICE_9864_IGNORE: "true"
+      HADOOP_HEAPSIZE: 1000
+      HADOOP_NAMENODE1_HOSTNAME: hdfs-namenode-1
+      HADOOP_DFS_REPLICATION: 2
+    ports:
+      - "9864:9864"
+      - "9866:9866"
+      - "9867:9867"
+      - "50010:50010"
+      - "50020:50020"
+      - "50475:50475"
+    extra_hosts:
+      - "hdfs-namenode-1:${HDFS_NAMENODE_1_STATIC_IP}"
+    healthcheck:
+      test: ["CMD", "hdfs", "dfs", "-test", "-e", "/"]
+      interval: 1m
+      timeout: 15s
+      retries: 3

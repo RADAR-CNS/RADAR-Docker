@@ -1,0 +1,152 @@
+---
+version: '2.2'
+
+volumes:
+  certs:
+    external: true
+  certs-data:
+    external: true
+
+services:
+  #---------------------------------------------------------------------------#
+  # Schema Registry                                                           #
+  #---------------------------------------------------------------------------#
+  schema-registry-1:
+    image: confluentinc/cp-schema-registry:5.2.0
+    restart: always
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: ${ZOOKEEPER_1_HOST}
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-1
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "localhost:8081/subjects"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # REST proxy                                                                #
+  #---------------------------------------------------------------------------#
+  rest-proxy-1:
+    image: confluentinc/cp-kafka-rest:5.2.0
+    depends_on:
+      - schema-registry-1
+    restart: always
+    environment:
+      KAFKA_REST_ZOOKEEPER_CONNECT: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+      KAFKA_REST_LISTENERS: http://0.0.0.0:8082
+      KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry-1:8081
+      KAFKA_REST_HOST_NAME: rest-proxy-1
+      KAFKA_REST_COMPRESSION_TYPE: lz4
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "localhost:8082/topics"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # Kafka Init                                                                #
+  #---------------------------------------------------------------------------#
+  kafka-init:
+    image: radarbase/radar-schemas-tools:${RADAR_SCHEMAS_VERSION}
+    depends_on:
+      - schema-registry-1
+    command: "topic_init.sh"
+    volumes:
+      - ./etc/schema:/schema/conf
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_3_HOST}
+      KAFKA_SCHEMA_REGISTRY: http://schema-registry-1:8081
+      KAFKA_NUM_BROKERS: 3
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_NUM_REPLICATION: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR Gateway                                                             #
+  #---------------------------------------------------------------------------#
+  gateway:
+    image: radarbase/radar-gateway:0.3.10
+    depends_on:
+      - rest-proxy-1
+    volumes:
+      - ./etc/gateway:/etc/radar-gateway
+    command: ["radar-gateway", "/etc/radar-gateway/gateway.yml"]
+    # environment:
+    #   RADAR_IS_CONFIG_LOCATION: /etc/radar-gateway/radar-is.yml
+    healthcheck:
+      # should give an unauthenticated response, rather than a 404
+      test: ["CMD-SHELL", "curl --fail localhost/radar-gateway/topics 2>&1 | grep -q 401 || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  #---------------------------------------------------------------------------#
+  # Catalog server from radar-schemas                                         #
+  #---------------------------------------------------------------------------#
+  catalog-server:
+    image: radarbase/radar-schemas-tools:${RADAR_SCHEMAS_VERSION}
+    depends_on:
+      - schema-registry-1
+    command: radar-catalog-server /schema/merged
+    volumes:
+      - ./etc/schema:/schema/conf
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_3_HOST}
+      KAFKA_SCHEMA_REGISTRY: http://schema-registry-1:8081
+      KAFKA_NUM_BROKERS: 3
+      RADAR_NUM_PARTITIONS: 3
+      RADAR_NUM_REPLICATION_FACTOR: 3
+    healthcheck:
+        test: ["CMD", "curl", "-f", "localhost:9010/source-types"]
+        interval: 1m30s
+        timeout: 5s
+        retries: 3
+
+  #---------------------------------------------------------------------------#
+  # Webserver                                                                 #
+  #---------------------------------------------------------------------------#
+  webserver:
+    image: nginx:1.14.0-alpine
+    restart: always
+    depends_on:
+      - schema-registry-1
+      - gateway
+      - catalog-server
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certs:/etc/letsencrypt
+      - certs-data:/data/letsencrypt
+      - "./etc/webserver/nginx.conf:/etc/nginx/nginx.conf:ro"
+      - "./etc/webserver/cors.conf:/etc/nginx/cors.conf:ro"
+      - "./etc/webserver/ip-access-control.conf:/etc/nginx/ip-access-control.conf:ro"
+      - "./etc/webserver/kafka-manager.htpasswd:/etc/nginx/kafka-manager.htpasswd:ro"
+      - "./etc/webserver/netdata.htpasswd:/etc/nginx/netdata.htpasswd:ro"
+      - "./etc/webserver/hdfs-namenode.htpasswd:/etc/nginx/hdfs-namenode.htpasswd:ro"
+      - "./etc/webserver/mlflow.htpasswd:/etc/nginx/mlflow.htpasswd:ro"
+    # healthcheck hard to do, however, it is possible to monitor this externally
+    # with
+    # docker logs --since 2m radarcphadoopstack_webserver_1 | grep "connect() failed"
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

@@ -1,0 +1,104 @@
+---
+version: '2.2'
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR JDBC connector for Raw topics                                       #
+  #---------------------------------------------------------------------------#
+  radar-jdbc-connector:
+    image: radarbase/radar-jdbc-connector:dev
+    restart: on-failure
+    volumes:
+      - ./etc/jdbc-connect/sink-jdbc.properties:/etc/kafka-connect/sink-jdbc.properties
+    depends_on:
+      - feature-db
+    ports:
+      - 8083:8083
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_3_HOST}
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: 'default'
+      CONNECT_CONFIG_STORAGE_TOPIC: 'default.config'
+      CONNECT_OFFSET_STORAGE_TOPIC: 'default.offsets'
+      CONNECT_STATUS_STORAGE_TOPIC: 'default.status'
+      CONNECT_KEY_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_VALUE_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_INTERNAL_KEY_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
+      CONNECT_INTERNAL_VALUE_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
+      CONNECT_OFFSET_STORAGE_FILE_FILENAME: '/var/lib/kafka-connect-jdbc/logs/connect.offsets'
+      CONNECT_REST_ADVERTISED_HOST_NAME: 'radar-jdbc-connector'
+      CONNECT_ZOOKEEPER_CONNECT: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+      CONNECTOR_PROPERTY_FILE_PREFIX: 'sink-jdbc'
+      KAFKA_HEAP_OPTS: '-Xms256m -Xmx2g'
+      KAFKA_BROKERS: 3
+      CONNECT_LOG4J_LOGGERS: 'org.reflections=ERROR'
+
+  #---------------------------------------------------------------------------#
+  # RADAR JDBC connector for aggregate streams                                #
+  #---------------------------------------------------------------------------#
+  radar-jdbc-connector-agg:
+    image: radarbase/radar-jdbc-connector:dev
+    restart: on-failure
+    volumes:
+      - ./etc/jdbc-connect/sink-jdbc-agg.properties:/etc/kafka-connect/sink-jdbc.properties
+    depends_on:
+      - feature-db
+    ports:
+      - 8084:8083
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: ${KAFKA_1_HOST},${KAFKA_2_HOST},${KAFKA_3_HOST}
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: 'default'
+      CONNECT_CONFIG_STORAGE_TOPIC: 'default.config'
+      CONNECT_OFFSET_STORAGE_TOPIC: 'default.offsets'
+      CONNECT_STATUS_STORAGE_TOPIC: 'default.status'
+      CONNECT_KEY_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_VALUE_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: ${SCHEMA_REGISTRY_URL}
+      CONNECT_INTERNAL_KEY_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
+      CONNECT_INTERNAL_VALUE_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
+      CONNECT_OFFSET_STORAGE_FILE_FILENAME: '/var/lib/kafka-connect-jdbc/logs/connect.offsets'
+      CONNECT_REST_ADVERTISED_HOST_NAME: 'radar-jdbc-connector-agg'
+      CONNECT_ZOOKEEPER_CONNECT: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+      CONNECTOR_PROPERTY_FILE_PREFIX: 'sink-jdbc'
+      KAFKA_HEAP_OPTS: '-Xms256m -Xmx2g'
+      KAFKA_BROKERS: 3
+      CONNECT_LOG4J_LOGGERS: 'org.reflections=ERROR'
+
+
+
+  #---------------------------------------------------------------------------#
+  # Feature Database                                                          #
+  #---------------------------------------------------------------------------#
+  feature-db:
+    image: postgres:13.1-alpine
+    restart: always
+    volumes:
+      - ${FEATURE_DB_DATA_DIR}:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: features
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

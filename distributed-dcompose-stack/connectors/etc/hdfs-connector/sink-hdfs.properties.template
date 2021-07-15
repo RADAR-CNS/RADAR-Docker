@@ -1,0 +1,10 @@
+name=radar-hdfs-sink-android-15000
+connector.class=io.confluent.connect.hdfs.HdfsSinkConnector
+tasks.max=4
+topics=android_empatica_e4_electrodermal_activity,android_empatica_e4_blood_volume_pulse,android_empatica_e4_temperature
+flush.size=80000
+rotate.interval.ms=900000
+hdfs.url=hdfs://hdfs-namenode-1:8020
+format.class=org.radarcns.sink.hdfs.AvroFormatRadar
+topics.dir=topicAndroidNew
+avro.codec=snappy

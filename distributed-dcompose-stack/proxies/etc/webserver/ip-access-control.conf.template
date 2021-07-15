@@ -1,0 +1,5 @@
+allow all;
+# restrict access to only certain IPs
+# allow 1.2.3.0/14;
+# allow 10.20.30.40;
+# deny all;

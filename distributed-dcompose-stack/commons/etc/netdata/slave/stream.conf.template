@@ -1,0 +1,9 @@
+[stream]
+    # stream metrics to another Netdata
+    enabled = yes
+
+    # the IP and PORT of the master
+    destination = 10.11.12.13:19999
+
+    # the API key to use
+    api key = 104B9526-D9DD-48C6-920E-0A7A6AA08B50

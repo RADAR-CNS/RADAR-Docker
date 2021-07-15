@@ -1,0 +1,3 @@
+etc/fitbit-connector/docker/source-fitbit.properties
+etc/hdfs-connector/sink-hdfs.properties
+etc/mongodb-connector/sink-mongo.properties

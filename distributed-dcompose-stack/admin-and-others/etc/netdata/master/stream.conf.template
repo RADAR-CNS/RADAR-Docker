@@ -1,0 +1,16 @@
+# generate this API key using uuidgen program
+[API-KEY]
+    # enable/disable this API key
+    enabled = yes
+
+    # one hour of data for each of the slaves
+    default history = 3600
+
+    # do not save slave metrics on disk
+    default memory = ram
+
+    # alarms checks, only while the slave is connected
+    health enabled by default = auto
+
+    # only allow slaves with following IP Addresses
+    allow from = *

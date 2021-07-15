@@ -1,0 +1,54 @@
+version: '3.3'
+
+services:
+    waitfordb:
+      image: dadarek/wait-for-dependencies
+      depends_on:
+        - pgdb
+      command: pgdb:5432
+
+    pgdb:
+        image: postgres:13.1-alpine
+        ports:
+          - 5432:5432
+        environment:
+          POSTGRES_USER: ${POSTGRES_USER}
+          POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+          POSTGRES_DB: mlflow-db
+        restart: always
+        volumes:
+          - ${MP_MLFLOW_DIR}/data:/var/lib/postgresql/data/
+
+    mlflow-server:
+        restart: always
+        build:
+          context: ../../images/mlflow-server/
+          args:
+            - DB_URI=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgdb:5432/mlflow-db
+            - SERVER_HOST=${HOST}
+            - SERVER_PORT=${MLFLOW_PORT}
+            - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
+        environment:
+            - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            - AWS_DEFAULT_REGION=${AWS_REGION}
+            - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+        ports:
+            - ${MLFLOW_PORT}:${MLFLOW_PORT}
+        depends_on:
+            - pgdb
+            - waitfordb
+            - s3
+        entrypoint: ["mlflow", "server", "--backend-store-uri",  $DB_URI, "--default-artifact-root",  $ARTIFACT_STORE, "--host",  $HOST, "--port",  $MLFLOW_PORT]
+
+    s3:
+        image: minio/minio:latest
+        container_name: aws-s3
+        ports:
+          - 9000:9000
+        environment:
+          - MINIO_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+          - MINIO_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+        command: server /data
+        volumes:
+          - ${MP_MLFLOW_DIR}/s3:/data

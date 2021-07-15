@@ -1,0 +1,2 @@
+resourceName: res_gateway
+publicKeyEndpoints: http://managementportal-app:8080/managementportal/oauth/token_key

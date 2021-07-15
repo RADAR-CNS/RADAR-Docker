@@ -1,0 +1,17 @@
+name=radar-timescale-sink
+connector.class=io.confluent.connect.jdbc.JdbcSinkConnector
+tasks.max=2
+transforms=mergeKey,timestamp
+transforms.mergeKey.type=org.radarbase.kafka.connect.transforms.MergeKey
+transforms.timestamp.type=org.radarbase.kafka.connect.transforms.TimestampConverter
+transforms.timestamp.fields=time,timeReceived,timeCompleted,timestamp
+connection.url=
+connection.user=grafana
+connection.password=
+dialect.name=TimescaleDBDatabaseDialect
+insert.mode=upsert
+pk.mode=record_value
+pk.fields=time, userId, projectId
+auto.create=true
+connection.attempts=3
+connection.backoff.ms=9000

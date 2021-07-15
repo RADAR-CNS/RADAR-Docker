@@ -1,0 +1,93 @@
+---
+version: '2.2'
+
+volumes:
+  portainer_data: {}
+  radar-backend-monitor-disconnect-data: {}
+  radar-source-statistics-data: {}
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR backend monitor                                                     #
+  #---------------------------------------------------------------------------#
+  radar-backend-monitor:
+    image: radarbase/radar-backend:0.4.0
+    command: monitor
+    volumes:
+      - ./etc/radar-backend/radar.yml:/etc/radar.yml
+      - radar-backend-monitor-disconnect-data:/var/lib/radar/data
+    restart: always
+    environment:
+      KAFKA_REST_PROXY: ${REST_PROXY_URL}
+      KAFKA_SCHEMA_REGISTRY: ${SCHEMA_REGISTRY_URL}
+      KAFKA_BROKERS: 3
+      # For backwards compatibility
+      TOPIC_LIST: "application_record_counts"
+
+
+  #---------------------------------------------------------------------------#
+  # RADAR Source Statitics monitor                                                     #
+  #---------------------------------------------------------------------------#
+  radar-source-statistics-monitor:
+    image: radarbase/radar-backend:0.4.0
+    command: statistics
+    volumes:
+      - ./etc/radar-backend/radar.yml:/etc/radar.yml
+      - radar-source-statistics-data:/var/lib/radar/data
+    restart: always
+    environment:
+      KAFKA_REST_PROXY: ${REST_PROXY_URL}
+      KAFKA_SCHEMA_REGISTRY: ${SCHEMA_REGISTRY_URL}
+      KAFKA_BROKERS: 3
+      # For backwards compatibility
+      TOPIC_LIST: "application_record_counts"
+
+
+  #---------------------------------------------------------------------------#
+  # Docker Monitoring                                                         #
+  #---------------------------------------------------------------------------#
+  portainer:
+    image: portainer/portainer:1.22.0
+    command: --admin-password '${PORTAINER_PASSWORD_HASH}'
+    volumes:
+      - "portainer_data:/data portainer/portainer"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    restart: always
+    ports:
+      - "9001:9000"
+
+  #---------------------------------------------------------------------------#
+  # Kafka Manager                                                             #
+  #---------------------------------------------------------------------------#
+  kafka-manager:
+    image: radarbase/kafka-manager:1.3.3.18
+    environment:
+      ZK_HOSTS: ${ZOOKEEPER_1_HOST},${ZOOKEEPER_2_HOST},${ZOOKEEPER_3_HOST}
+    restart: always
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "[ $$(wget -q -O - localhost:9000/kafkamanager/api/health) = healthy ] || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  netdata-master:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/master/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/master/health_alarm_notify.conf:/etc/netdata/health_alarm_notify.conf:ro
+      - ./etc/netdata/master/mail/.msmtprc:/etc/netdata/.msmtprc:ro
+      - ./etc/netdata/master/python.d/nginx.conf:/etc/netdata/python.d/nginx.conf
+    environment:
+      PGID: 999

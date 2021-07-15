@@ -1,0 +1,10 @@
+[Unit]
+Description=RADAR-Docker hourly data restructuring
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+Unit=radar-output.service
+
+[Install]
+WantedBy=default.target

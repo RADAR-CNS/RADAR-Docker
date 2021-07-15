@@ -1,0 +1,169 @@
+---
+version: '2.2'
+
+networks:
+  management:
+    driver: bridge
+    internal: true
+  mail:
+    driver: bridge
+    internal: true
+
+services:
+  #---------------------------------------------------------------------------#
+  # Email server                                                              #
+  #---------------------------------------------------------------------------#
+  smtp:
+    image: namshi/smtp:latest
+    networks:
+      - mail
+      - default
+    volumes:
+      - /var/spool/exim
+    restart: always
+    ports:
+      - "25:25"
+    env_file:
+      - ./etc/smtp.env
+
+  #---------------------------------------------------------------------------#
+  # Management Portal                                                         #
+  #---------------------------------------------------------------------------#
+  managementportal-app:
+    image: radarbase/management-portal:0.5.6
+    networks:
+      - management
+      - mail
+      - default
+    depends_on:
+      - radarbase-postgresql
+      - smtp
+      - catalog-server
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,swagger
+      SPRING_DATASOURCE_URL: jdbc:postgresql://radarbase-postgresql:5432/managementportal
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      MANAGEMENTPORTAL_MAIL_FROM: ${FROM_EMAIL}
+      MANAGEMENTPORTAL_COMMON_BASEURL: https://${SERVER_NAME}/
+      MANAGEMENTPORTAL_COMMON_MANAGEMENT_PORTAL_BASE_URL: https://${SERVER_NAME}/managementportal
+      MANAGEMENTPORTAL_FRONTEND_CLIENT_SECRET: ${MANAGEMENTPORTAL_FRONTEND_CLIENT_SECRET}
+      MANAGEMENTPORTAL_OAUTH_CLIENTS_FILE: /mp-includes/config/oauth_client_details.csv
+      MANAGEMENTPORTAL_CATALOGUE_SERVER_ENABLE_AUTO_IMPORT: ${MANAGEMENTPORTAL_CATALOGUE_SERVER_ENABLE_AUTO_IMPORT}
+      MANAGEMENTPORTAL_CATALOGUE_SERVER_SERVER_URL: ${MANAGEMENTPORTAL_CATALOGUE_SERVER_URL}
+      MANAGEMENTPORTAL_COMMON_ADMIN_PASSWORD: ${MANAGEMENTPORTAL_COMMON_ADMIN_PASSWORD}
+      MANAGEMENTPORTAL_COMMON_PRIVACY_POLICY_URL: ${MANAGEMENTPORTAL_COMMON_PRIVACY_POLICY_URL}
+      MANAGEMENTPORTAL_OAUTH_META_TOKEN_TIMEOUT: PT2H
+      MANAGEMENTPORTAL_OAUTH_ENABLE_PUBLIC_KEY_VERIFIERS: "true"
+      RADAR_IS_CONFIG_LOCATION: /mp-includes/config/radar-is.yml
+      SPRING_APPLICATION_JSON: '{"managementportal":{"oauth":{"checkingKeyAliases":["${MANAGEMENTPORTAL_OAUTH_CHECKING_KEY_ALIASES_0}","${MANAGEMENTPORTAL_OAUTH_CHECKING_KEY_ALIASES_1}"]}}}'
+      JHIPSTER_SLEEP: 10 # gives time for the database to boot before the application
+      JAVA_OPTS: -Xmx256m  # maximum heap size for the JVM running ManagementPortal, increase this as necessary
+    volumes:
+      - ./etc/managementportal/:/mp-includes/
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "localhost:8080/managementportal/oauth/token_key"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  radarbase-postgresql:
+    build:
+      context: ../../dcompose-stack/radar-cp-hadoop-stack/images/postgres
+      args:
+        POSTGRES_VERSION: ${POSTGRES_VERSION}
+    image: radarbase/postgres:${POSTGRES_VERSION}-1
+    volumes:
+      - "${MP_POSTGRES_DIR}/data/:/var/lib/postgresql/data/"
+    environment:
+      POSTGRES_USER : ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_MULTIPLE_DATABASES: managementportal,restsourceauthorizer
+    networks:
+      - management
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD='${POSTGRES_PASSWORD}' psql -U '${POSTGRES_USER}' managementportal -l || exit 1"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  radar-rest-sources-backend:
+    image: radarbase/radar-rest-source-auth-backend:2.0
+    depends_on:
+      - radarbase-postgresql
+    networks:
+      - default
+      - management
+    volumes:
+      - ./etc/rest-source-authorizer/authorizer.yml:/etc/authorizer-app-backend/authorizer.yml
+    ports:
+      - 8090:8080
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 3
+
+  radar-rest-sources-authorizer:
+      image: radarbase/radar-rest-source-authorizer:2.0
+      depends_on:
+        - radar-rest-sources-backend
+        - radarbase-postgresql
+      environment:
+        BASE_HREF: "/rest-sources/authorizer/"
+        BACKEND_BASE_URL: "https://${SERVER_NAME}/rest-sources/backend"
+        VALIDATE: "true"
+        AUTH_GRANT_TYPE: "authorization_code"
+        AUTH_CLIENT_ID: "${REST_SOURCES_AUTH_MP_CLIENT_ID}"
+        AUTH_CLIENT_SECRET: "${REST_SOURCES_AUTH_MP_CLIENT_SECRET}"
+        AUTH_CALLBACK_URL: "https://${SERVER_NAME}/rest-sources/authorizer/login"
+        AUTH_URI: "https://${SERVER_NAME}/managementportal/oauth"
+      ports:
+        - 9000:80
+      healthcheck:
+        test: ["CMD", "wget", "--spider", "http://localhost:80"]
+        interval: 1m30s
+        timeout: 5s
+        retries: 3
+
+  #---------------------------------------------------------------------------#
+  # RADAR REDCap Integration                                                  #
+  #---------------------------------------------------------------------------#
+  redcap-integration:
+    image: radarbase/radar-redcapintegration:1.0.3
+    networks:
+      - management
+      - default
+    depends_on:
+      - managementportal-app
+    restart: always
+    volumes:
+      - "./etc/redcap-integration:/usr/local/etc/radar-redcap-int"
+    ports:
+      - 9010:8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget --post-data {} http://localhost:8080/redcap/trigger 2>&1 | grep -q 400 || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  netdata-slave:
+    image: netdata/netdata:v1.17.0
+    privileged: true
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/netdata/slave/stream.conf:/etc/netdata/stream.conf:ro
+      - ./etc/netdata/slave/netdata.conf:/etc/netdata/netdata.conf:ro
+    environment:
+      PGID: 999

@@ -1,0 +1,34 @@
+---
+version: '2.2'
+
+services:
+  #---------------------------------------------------------------------------#
+  # RADAR Cold Storage                                                        #
+  #---------------------------------------------------------------------------#
+  hdfs-namenode:
+    build:
+      context: ../../dcompose-stack/radar-cp-hadoop-stack/images/hdfs
+      args:
+        BASE_VERSION: ${HDFS_BASE_VERSION}
+    image: radarbase/hdfs:${HDFS_BASE_VERSION}
+    command: namenode-1
+    #hostname: hdfs-namenode-1
+    volumes:
+      - "${HDFS_NAME_DIR_1}:/hadoop/dfs/name/1"
+      - "${HDFS_NAME_DIR_2}:/hadoop/dfs/name/2"
+    restart: always
+    environment:
+      SERVICE_8020_NAME: namenode
+      SERVICE_9870_IGNORE: "true"
+      HADOOP_HEAPSIZE: 1000
+      HADOOP_NAMENODE1_HOSTNAME: hdfs-namenode
+      HADOOP_DFS_NAME_DIR: file:///hadoop/dfs/name/1,file:///hadoop/dfs/name/2
+    ports:
+      - "8020:8020"
+      - "9870:9870"
+      - "8022:8022"
+    healthcheck:
+      test: ["CMD", "hdfs", "dfs", "-test", "-e", "/"]
+      interval: 1m
+      timeout: 15s
+      retries: 3
